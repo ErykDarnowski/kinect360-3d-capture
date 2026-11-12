@@ -1,6 +1,15 @@
-# Kinect 3D capture
+# Kinect 360 3D Capture
 
 Capture 3D scans and depth recordings with an Xbox 360 Kinect on Linux, then play them back in Blender.
+
+![Xbox 360 Kinect connected to a laptop running freenect-glview](media/thumb.jpg)
+
+<p align="center">
+  <a href="media/demo.mp4"><img src="media/demo.gif" alt="A depth recording played back in Blender as a 3D surface"></a>
+  <br>
+  <em>A recording played back in Blender (<a href="media/demo.mp4">full-quality video</a>).<br>
+  Shown in grey here, but every point also stores the colour from the Kinect's RGB camera.</em>
+</p>
 
 | File | What it does |
 |---|---|
@@ -16,6 +25,8 @@ blender --python kinect_blender.py -- rec_<date>_<time>     # 3. play it back in
 ```
 
 ## Setup (Fedora)
+
+> **Tested with:** Xbox 360 Kinect · Fedora 44 · Python 3.14 · numpy 2.4 · libfreenect 0.7.5 · Blender 5.2
 
 **Hardware.** The Kinect needs its 12 V power adapter plugged into the wall as well as USB. Check that all three parts are detected:
 
@@ -109,6 +120,7 @@ Each frame becomes its own object, visible only on its own frame of the timeline
 
 - **Space**: play / pause
 - **Middle-mouse drag**: orbit while it plays
+- **Colour vs. shape**: the scene opens in *Material Preview* with the real colours. Switch the viewport to *Solid* to see the bare geometry in grey, as in the demo above
 - **Numpad 0**: view through the `Kinect` camera (placed where the real sensor was, same ~62° field of view)
 - **Dot size**: Geometry Nodes tab → *Kinect points* group → *Point size*
 - **Render a video**: Output Properties → FFmpeg Video, then Render → Render Animation
