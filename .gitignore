@@ -2,3 +2,7 @@ __pycache__
 *.blend
 /rec_*
 *.ply
+
+# full-size originals (web versions are thumb.jpg, demo.mp4)
+media/thumb.png
+media/show.mp4
