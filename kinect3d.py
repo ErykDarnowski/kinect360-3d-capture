@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Capture Kinect 360 depth + colour as 3D .ply files (point cloud or mesh).
 
   python3 kinect3d.py snap                 # one scan -> scan_<time>.ply

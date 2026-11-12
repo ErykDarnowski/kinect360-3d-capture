@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Load a kinect3d.py recording (folder of frame_XXXXX.ply) into Blender as an animation.
 
 From a terminal:
