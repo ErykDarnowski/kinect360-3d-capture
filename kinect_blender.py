@@ -3,6 +3,7 @@
 From a terminal:
     blender --python kinect_blender.py -- rec_20261111_173235
     blender --python kinect_blender.py -- rec_20261111_173235 --save scene.blend
+    blender --python kinect_blender.py -- rec_20261111_173235 --mesh    (join points into surfaces)
     blender -b --python kinect_blender.py -- rec_... --save scene.blend    (no window, just build the .blend)
 
 Or inside Blender: Scripting tab -> open this file -> set FOLDER below -> Run Script.
@@ -22,7 +23,44 @@ import numpy as np
 FOLDER = ""        # used when run from inside Blender without command-line arguments
 POINT_SIZE = 1.0   # dot size relative to the gap between neighbouring points (point clouds only)
 
-FX, W, H = 529.2, 640, 480  # Kinect 360 RGB camera focal length (px) and image size
+MESH = False       # True = join points into a surface (same as --mesh on the command line)
+EDGE = 0.04        # --mesh: don't join neighbours whose depth differs by more than ~4% (object edges)
+
+# Kinect 360 RGB camera intrinsics (must match kinect3d.py) and image size
+FX, FY, CX, CY, W, H = 529.2, 525.6, 328.9, 267.5, 640, 480
+
+
+def to_pixels(xyz):
+    """Project points back to the Kinect image -> (u, v) pixel coordinates and depth."""
+    d = np.maximum(xyz[:, 1], 1e-6)
+    return xyz[:, 0] * FX / d + CX, -xyz[:, 2] * FY / d + CY, d
+
+
+def detect_step(xyz):
+    """Pixel spacing the recording was made with (--step), from the projected point positions."""
+    u = np.unique(np.round(to_pixels(xyz[:20000])[0]))
+    return max(1, int(np.median(np.diff(u)))) if len(u) > 1 else 1
+
+
+def grid_triangles(xyz, step):
+    """Rebuild a surface from a point cloud: join points that were neighbouring pixels on the depth image."""
+    u, v, d = to_pixels(xyz)
+    gu, gv = np.round(u / step).astype(np.int64), np.round(v / step).astype(np.int64)
+    h, w = H // step + 2, W // step + 2
+    ok = (gu >= 0) & (gu < w) & (gv >= 0) & (gv < h)
+    idx = np.full((h, w), -1, np.int32)
+    dep = np.zeros((h, w), np.float32)
+    idx[gv[ok], gu[ok]] = np.nonzero(ok)[0]
+    dep[gv[ok], gu[ok]] = d[ok]
+    tl, tr, bl, br = idx[:-1, :-1], idx[:-1, 1:], idx[1:, :-1], idx[1:, 1:]
+    dtl, dtr, dbl, dbr = dep[:-1, :-1], dep[:-1, 1:], dep[1:, :-1], dep[1:, 1:]
+    lim = EDGE * step * np.maximum(dtl, 0.5)
+    tris = []
+    for a, b, c, da, db, dc in ((tl, bl, tr, dtl, dbl, dtr), (tr, bl, br, dtr, dbl, dbr)):
+        good = (a >= 0) & (b >= 0) & (c >= 0)
+        good &= (np.abs(da - db) < lim) & (np.abs(da - dc) < lim) & (np.abs(db - dc) < lim)
+        tris.append(np.stack([a[good], b[good], c[good]], 1))
+    return np.concatenate(tris).astype(np.int32)
 
 
 def read_ply(path):
@@ -110,7 +148,7 @@ def make_points_nodes(mat, step):
     return ng
 
 
-def load(folder, save=None):
+def load(folder, save=None, mesh=MESH):
     folder = os.path.abspath(folder)
     files = sorted(glob.glob(os.path.join(folder, "frame_*.ply")))
     if not files:
@@ -135,13 +173,16 @@ def load(folder, save=None):
     mat = make_material()
     nodes = None
     first_xyz = None
-    print(f"Loading {len(files)} frames from {folder} at {fps} fps ...")
+    step = meta.get("step")
+    print(f"Loading {len(files)} frames from {folder} at {fps} fps" + (" as surfaces" if mesh else "") + " ...")
     for i, path in enumerate(files, 1):
         xyz, rgb, tris = read_ply(path)
+        if not step and len(xyz):
+            step = detect_step(xyz)
+        if mesh and not len(tris) and len(xyz):
+            tris = grid_triangles(xyz, step)
         if nodes is None and not len(tris):
-            # point spacing: from meta, else guess from point count (full res ~200k+, step 2 ~50k)
-            step = meta.get("step") or max(1, round(math.sqrt(W * H * 0.75 / max(len(xyz), 1))))
-            nodes = make_points_nodes(mat, step)
+            nodes = make_points_nodes(mat, step or 1)
         if first_xyz is None:
             first_xyz = xyz
         me = make_mesh(f"{name}_{i:05d}", xyz, rgb, tris)
@@ -209,7 +250,7 @@ def main():
         save = argv[argv.index("--save") + 1]
     if not folder:
         raise SystemExit("Give a recording folder: blender --python kinect_blender.py -- rec_XXXX  (or set FOLDER)")
-    load(folder, save)
+    load(folder, save, mesh=MESH or "--mesh" in argv)
 
 
 main()
